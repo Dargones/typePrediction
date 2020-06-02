@@ -3,3 +3,4 @@ java/.idea/*
 java/java.iml
 java/lib/*
 java/out/*
+notebooks/.ipynb_checkpoints/*

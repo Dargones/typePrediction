@@ -6,8 +6,6 @@ import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
-import java.util.Optional;
-
 public class BardParser implements Parser {
 
     /**
