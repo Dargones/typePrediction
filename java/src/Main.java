@@ -23,9 +23,8 @@ import java.util.stream.Collectors;
 public abstract class Main {
 
     public static void main(String[] args) {
-        String baseDir = "/Volumes/My Passport/import_prediction/data/";
-        String dirIn = baseDir + "GitHubOriginal";
-        String dirOut = baseDir + "GitHubParsed2";
+        String dirIn =  "/Volumes/My Passport/import_prediction/data/GitHubOriginal";
+        String dirOut = "/Volumes/My Passport/typePrediction/data/Parsed2";
         for (String fileName: new File(dirIn).list())
             processDataset(dirIn + "/" + fileName, dirOut + "/" + fileName);
     }
@@ -44,7 +43,7 @@ public abstract class Main {
         try {
             lines = Files.lines(Paths.get(inputFile))
                     .map(file -> parseJSON(jsonParser, file))
-                    .map(file -> parser.extractImports(file, javaParser))
+                    .map(file -> parser.extractData(file, javaParser))
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList()); // get the list of files
         } catch (IOException e) {

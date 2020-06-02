@@ -1,14 +1,15 @@
 import com.github.javaparser.JavaParser;
-import com.github.javaparser.ast.*;
+import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.ImportDeclaration;
+import com.github.javaparser.ast.PackageDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import com.github.javaparser.javadoc.Javadoc;
 import com.github.javaparser.javadoc.JavadocBlockTag;
+import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
-
-import java.util.Optional;
 
 public class TuftsParser implements Parser {
 
@@ -18,10 +19,18 @@ public class TuftsParser implements Parser {
      * @return     the object that can be filled with parse information
      */
     public JSONObject constructEmpyTable(JSONObject obj) {
+        String[] path = obj.get("path").toString().split("/");
+        String name = path[path.length -1].split("\\.")[0];
+
         JSONObject data = new JSONObject();
         data.put("repo", obj.get("repo_name")); // name of the repository associated with this file
         data.put("classes", new JSONObject());
         data.put("currentClass", new JSONObject());
+        data.put("classImports", new JSONArray());
+        data.put("wildcardImports", new JSONArray());
+        data.put("declaredClasses", new JSONArray());
+        data.put("package", "");
+        data.put("filename", name);
         return data;
     }
 
@@ -32,30 +41,26 @@ public class TuftsParser implements Parser {
      * @param javaParser  the Parser object to use
      * @return
      */
-    public JSONObject extractImports(JSONObject obj, JavaParser javaParser) {
+    public JSONObject extractData(JSONObject obj, JavaParser javaParser) {
         JSONObject data = constructEmpyTable(obj);
 
         if (obj.get("content") == null) {  // if the file contains no code, do not attempt parsing
             System.out.println("File is empty");
             return null;
         }
-        Optional<CompilationUnit> parseResult;
+
+        CompilationUnit ast;
         try {
-            parseResult = javaParser.parse((String) obj.get("content")).getResult();
+            ast = javaParser.parse((String) obj.get("content"));
         } catch (Exception e) {
             System.out.println("Bad Java parse error"); // if parsing failed, return an empty object
-            return null;
-        }
-        if (!parseResult.isPresent()) {
-            System.out.println("Java parse error");
-            return null;
+            return data;
         }
 
-        CompilationUnit ast = parseResult.get();
         TuftsParser.DataCollector visitor = new TuftsParser.DataCollector();
         visitor.visit(ast, data);
         data.remove("currentClass");
-        if (((JSONObject) data.get("classes")).isEmpty())
+        if (data.get("package").equals(""))
             return null;
         return data;
     }
@@ -63,7 +68,20 @@ public class TuftsParser implements Parser {
     /**
      * A visitor class that fills a json object with information extracted from teh AST
      */
-    private static class DataCollector extends VoidVisitorAdapter<JSONObject> {
+    static class DataCollector extends VoidVisitorAdapter<JSONObject> {
+
+        /**
+         * Record a package declaration
+         * @param id   the node in the AST
+         * @param data json object to record the package name to
+         */
+        @Override
+        public void visit(PackageDeclaration id, JSONObject data) {
+            if (id.getNameAsString().equals(""))
+                return;
+            data.put("package", id.getNameAsString());
+            super.visit(id, data);
+        }
 
         /**
          * Make sure that the name of the main class\interface in the compilation unit matches
@@ -74,14 +92,21 @@ public class TuftsParser implements Parser {
          */
         @Override
         public void visit(ClassOrInterfaceDeclaration id, JSONObject data) {
-            if (!id.getFullyQualifiedName().isPresent())
-                return;
-            String fullName = id.getFullyQualifiedName().get();
             JSONObject classObject = new JSONObject();
             data.put("currentClass", classObject);
             super.visit(id, data);
+
+            String fullName = getFullyQualifiedName(id.getNameAsString(), data);
+            ((JSONArray) data.get("declaredClasses")).add(fullName);
+
             if (!classObject.isEmpty())
                 ((JSONObject) data.get("classes")).put(fullName, classObject);
+        }
+
+        public String getFullyQualifiedName(String className, JSONObject data) {
+            if (className.equals(data.get("filename")))
+                return data.get("package") + "." + className;
+            return data.get("package") + "." + data.get("filename") + "." + className;
         }
 
         public void visit(MethodDeclaration id, JSONObject data) {
@@ -120,7 +145,9 @@ public class TuftsParser implements Parser {
                 hasDocStrings = true;
             methodObject.put("docstring", methodDocString);
 
-            methodObject.put("source", id.getTokenRange().toString());
+            if (!id.getTokenRange().isPresent())
+                return;
+            methodObject.put("source", id.getTokenRange().get().toString());
 
             if (hasDocStrings)
                 classObject.put(id.getNameAsString(), methodObject);
@@ -144,6 +171,19 @@ public class TuftsParser implements Parser {
                 if (block.getType() ==  JavadocBlockTag.Type.RETURN)
                     return block.getContent().toText();
             return "";
+        }
+
+        @Override
+        public void visit(ImportDeclaration id, JSONObject data) {
+            super.visit(id, data);
+            String name = id.getNameAsString();
+            if (id.isAsterisk()) {
+                String[] parts = name.split("\\.");
+                if (Character.isUpperCase(parts[parts.length - 1].charAt(0))) // class * import
+                    return;
+                ((JSONArray) data.get("wildcardImports")).add(name);
+            } else
+                ((JSONArray) data.get("classImports")).add(name);
         }
 
     }

@@ -1,1 +1,5 @@
 data/*
+java/.idea/*
+java/java.iml
+java/lib/*
+java/out/*

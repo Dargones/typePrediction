@@ -37,26 +37,22 @@ public class BardParser implements Parser {
      * @param javaParser  the Parser object to use
      * @return
      */
-    public JSONObject extractImports(JSONObject obj, JavaParser javaParser) {
+    public JSONObject extractData(JSONObject obj, JavaParser javaParser) {
         JSONObject data = constructEmpyTable(obj);
 
         if (obj.get("content") == null) {  // if the file contains no code, do not attempt parsing
             System.out.println("File is empty");
             return data;
         }
-        Optional<CompilationUnit> parseResult;
+
+        CompilationUnit ast;
         try {
-            parseResult = javaParser.parse((String) obj.get("content")).getResult();
+            ast = javaParser.parse((String) obj.get("content"));
         } catch (Exception e) {
             System.out.println("Bad Java parse error"); // if parsing failed, return an empty object
             return data;
         }
-        if (!parseResult.isPresent()) {
-            System.out.println("Java parse error");
-            return data;
-        }
 
-        CompilationUnit ast = parseResult.get();
         DataCollector visitor = new DataCollector();
         visitor.visit(ast, data);
         if (data.get("name").toString().equals("")) {
@@ -126,8 +122,8 @@ public class BardParser implements Parser {
         @Override
         public void visit(ClassOrInterfaceDeclaration id, JSONObject data) {
             super.visit(id, data);
-            if ((!id.hasModifier(Modifier.Keyword.PUBLIC)) ||
-                    (id.hasModifier(Modifier.Keyword.STATIC)) ||
+            if ((!id.getModifiers().contains(Modifier.PUBLIC)) ||
+                    (id.getModifiers().contains(Modifier.STATIC)) ||
                     (id.getParentNode().get() instanceof ClassOrInterfaceDeclaration))
                 return;
             if (!id.getNameAsString().equals(data.get("name"))) { // that can only happen in bad code
