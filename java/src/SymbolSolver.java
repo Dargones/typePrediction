@@ -108,8 +108,6 @@ public class SymbolSolver {
     public String solveSingleType(String type, String className, String methodName) {
         if (Character.isLowerCase(type.charAt(0)))
             return type; // either already a fully qualified name or a primitive class
-        if (javaLang.contains(type)) // a java.lang class
-            return "java.lang." + type;
         if ((methodTypeParameters.getOrDefault(className + "." + methodName, new HashSet<>()).contains(type)) ||
                 (classTypeParameters.getOrDefault(className, new HashSet<>()).contains(type)))
             return TYPE_PARAM;
@@ -117,6 +115,8 @@ public class SymbolSolver {
         if (!type.contains(".")) { // public class or interface
             if (localClassIndex.containsKey(type)) // directly imported
                 return localClassIndex.get(type) + "." + type;
+            if (javaLang.contains(type)) // a java.lang class
+                return "java.lang." + type;
             // from a known wildcard import from within the repository
             if (globalClassIndex.classToPackToRepo.containsKey(type)) {
                 for (String pack:globalClassIndex.classToPackToRepo.get(type).keySet())
