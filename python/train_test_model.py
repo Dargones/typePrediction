@@ -1,3 +1,6 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import argparse
 import numpy as np
 import pickle
@@ -44,12 +47,9 @@ with open(args.prefix + "label_dict.pkl", 'rb') as f:
 if args.mode != 'test':
 
     with open(args.prefix + "train_set.pkl", 'rb') as f:
-        train_ds = tf.data.Dataset.from_tensor_slices(pickle.load(f))
+        train_X, train_y = pickle.load(f)
     with open(args.prefix + "dev_set.pkl", 'rb') as f:
-        dev_ds = tf.data.Dataset.from_tensor_slices(pickle.load(f))
-
-    train_ds = train_ds.shuffle(20000).batch(args.batch_size)
-    dev_ds = dev_ds.shuffle(20000).batch(args.batch_size)
+        dev_ds = pickle.load(f)
 
     if args.load_model:
         model = load_model(args.prefix + 'model.h5')
@@ -76,8 +76,10 @@ if args.mode != 'test':
         mode='min',
         save_best_only=True)
 
-    model.fit(train_ds, epochs=args.epochs, validation_data=dev_ds, shuffle=True,
-              callbacks=[early_stopping_callback, model_checkpoint_callback])
+    model.fit(train_X, train_y, epochs=args.epochs,
+              validation_data=dev_ds, shuffle=True,
+              callbacks=[early_stopping_callback, model_checkpoint_callback],
+              batch_size=args.batch_size)
 
 # --------------------------------------------------------------------------------------------------
 # Testing the Model (Optional)
@@ -93,3 +95,5 @@ if args.mode != "train":
     y_preds = model.predict(test_xs)
     y_preds_bool = np.argmax(y_preds, axis=1)
     print(classification_report(test_ys, y_preds_bool))
+    with open(args.prefix + "results_{}_{}_{}_{}_txt".format(args.emb_dim, args.lr, args.hidden_units_dense, args.hidden_units_lstm), 'w') as f:
+        f.write(classification_report(test_ys, y_preds_bool))

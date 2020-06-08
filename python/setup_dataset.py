@@ -5,6 +5,7 @@ import json
 import pickle
 from sklearn.model_selection import train_test_split
 import sys
+import numpy as np
 import tensorflow as tf
 from tqdm.auto import tqdm
 import warnings
@@ -212,7 +213,7 @@ def vectorize_and_filter(dataset, lang_tokenizer, label_to_idx, other_label):
             output_data.append(label_to_idx[other_label])
 
     in_data = tf.keras.preprocessing.sequence.pad_sequences(input_data).squeeze()
-    return in_data, output_data
+    return in_data, np.array(output_data)
 
 
 def pickle_dump(data, file):
@@ -234,7 +235,7 @@ def parse_arguments():
     p = argparse.ArgumentParser(description='Prepare the dataset for use by neural models.')
     p.add_argument("json_file", type=argparse.FileType('r'), help="json file with all the data")
     p.add_argument("prefix", type=str, help="prefix for all the generated files")
-    p.add_argument("data_type", type=str, choices=["names", "commens", "nc"],
+    p.add_argument("data_type", type=str, choices=["names", "comments", "nc"],
                    default="nc", help="type of the information recorded in the dataset")
     p.add_argument("labels", type=str, choices=["PROG", "ALL", "TOP"],
                    default="PROG", help="method by which to choose the labels for the dataset")
